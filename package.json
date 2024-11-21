@@ -23,14 +23,26 @@
     },
     "files": [
       "**/*",
-      "!**/*.ps1",
-      "build/Quick-Resume-Modified.ps1",
-      "build/Quick-Resume.ps1"
+      "!**/*.ps1"
+    ],
+    "extraResources": [
+      {
+        "from": ".",
+        "filter": [
+          "Quick-Resume.ps1",
+          "Quick-Resume-Modified.ps1"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "Quick-Resume.ps1",
+      "Quick-Resume-Modified.ps1"
     ],
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "icon.png"
     },
     "nsis": {
       "oneClick": true,

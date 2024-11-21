@@ -14,7 +14,7 @@ function createWindow () {
   })
 
   win.loadFile('index.html')
-  win.webContents.openDevTools()
+  // win.webContents.openDevTools()
 }
 
 app.whenReady().then(() => {
@@ -35,7 +35,13 @@ app.on('window-all-closed', () => {
 
 // PowerShell execution functions
 function executePowerShell(command, processName = '') {
-  const scriptPath = path.join(__dirname, 'Quick-Resume.ps1')
+  let scriptPath;
+  if (app.isPackaged) {
+    scriptPath = path.join(process.resourcesPath, 'Quick-Resume.ps1');
+  } else {
+    scriptPath = path.join(__dirname, 'Quick-Resume.ps1');
+  }
+  
   const fullCommand = `powershell -ExecutionPolicy Bypass -NoProfile -NonInteractive -NoLogo -File "${scriptPath}" -Command "${command}" ${processName ? `-ProcessName "${processName}"` : ''}`
   
   console.log('Executing PowerShell command:', fullCommand)
@@ -52,33 +58,32 @@ function executePowerShell(command, processName = '') {
         console.error('PowerShell stderr:', stderr)
       }
 
-      // Clean up the output and find the JSON object
-      const cleanOutput = stdout.trim()
-      console.log('PowerShell raw output:', cleanOutput)
-
       try {
-        // Find the last JSON object in the output
-        const jsonMatch = cleanOutput.match(/\{[\s\S]*\}/);
+        // Clean up the output and find the JSON object
+        const cleanOutput = stdout.trim()
+        console.log('PowerShell raw output:', cleanOutput)
+
+        if (!cleanOutput) {
+          resolve({ Success: true })
+          return
+        }
+
+        // Try to find a JSON object in the output
+        const jsonMatch = cleanOutput.match(/\{[\s\S]*\}/)
         if (!jsonMatch) {
-          throw new Error('No valid JSON found in output');
+          throw new Error('No valid JSON found in output')
         }
-        
-        const result = JSON.parse(jsonMatch[0]);
-        console.log('Parsed result:', result)
-        
+
+        const result = JSON.parse(jsonMatch[0])
+        console.log('Parsed PowerShell result:', result)
+
         if (!result.Success && !result.Message) {
-          result.Message = 'Operation failed';
+          result.Message = 'Operation failed'
         }
-        
-        if (result.Logs) {
-          result.Logs.forEach(log => {
-            console.log(`[${log.Type}] ${log.Message}`)
-          })
-        }
-        
+
         resolve(result)
       } catch (e) {
-        console.error('JSON parse error:', e, 'Raw output:', cleanOutput)
+        console.error('JSON parse error:', e, 'Raw output:', stdout)
         reject({ Success: false, Message: 'Failed to process PowerShell output' })
       }
     })

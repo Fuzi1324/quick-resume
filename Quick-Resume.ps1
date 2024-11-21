@@ -382,7 +382,7 @@ function Get-ProcessInfo {
     )
 
     $isSuspended = $false
-    if ($Global:SuspendedProcesses.ContainsKey($Process.Id.ToString())) {
+    if ($Global:SuspendedProcesses.ContainsKey($Process.Id)) {
         $isSuspended = $true
     }
 
