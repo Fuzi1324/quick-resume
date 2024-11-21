@@ -1,0 +1,42 @@
+{
+  "name": "quick-resume",
+  "version": "1.0.0",
+  "description": "An Electron.js application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "electron-builder build --win --publish never",
+    "deploy": "electron-builder build --win --publish always"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^25.3.1",
+    "electron-builder": "^24.6.4"
+  },
+  "build": {
+    "appId": "com.quickresume.app",
+    "productName": "Quick Resume",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!**/*.ps1",
+      "build/Quick-Resume-Modified.ps1",
+      "build/Quick-Resume.ps1"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "uninstallDisplayName": "Quick Resume",
+      "license": "license.txt",
+      "createDesktopShortcut": true
+    }
+  }
+}
