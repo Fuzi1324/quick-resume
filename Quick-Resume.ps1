@@ -122,6 +122,7 @@ function Initialize-State {
                                 ProcessName = $item.Value.ProcessName
                                 WindowHandle = $windowHandle
                                 WindowStyle = [int]$item.Value.WindowStyle
+                                WindowTitle = $item.Value.WindowTitle
                                 SuspendTime = [DateTime]::Parse($item.Value.SuspendTime)
                             }
                             Write-Output-Message "Successfully restored state for $($item.Value.ProcessName) (ProcessId: $processId)"
@@ -187,6 +188,7 @@ function Save-State {
                     ProcessName = $proc.ProcessName
                     WindowHandle = $proc.WindowHandle.ToInt64()
                     WindowStyle = $proc.WindowStyle
+                    WindowTitle = $proc.WindowTitle
                     SuspendTime = $proc.SuspendTime.ToString("o")  # ISO 8601 Format für bessere Kompatibilität
                 }
             }
@@ -291,26 +293,26 @@ function Suspend-Process {
     $processes = Get-Process -Name $procname -ErrorAction SilentlyContinue
     
     if (!$processes) {
-        Write-Output-Message "Process not found: $procname"
-        return
+        Write-Output-Message "Process not found: $procname" -Type "Error"
+        return $false
     }
     
     foreach ($proc in $processes) {
         if ($Global:SuspendedProcesses.ContainsKey($proc.Id)) {
-            Write-Output-Message "Process already suspended: $procname (PID: $($proc.Id))"
+            Write-Output-Message "Process already suspended: $procname (PID: $($proc.Id))" -Type "Warning"
             continue
         }
         
         $windowHandle = $proc.MainWindowHandle
         if ($windowHandle -eq [IntPtr]::Zero) {
-            Write-Output-Message "No main window found for process: $procname (PID: $($proc.Id))"
+            Write-Output-Message "No main window found for process: $procname (PID: $($proc.Id))" -Type "Warning"
             continue
         }
         
         try {
             $style = [ProcessControl]::GetWindowLong($windowHandle, $WINDOW_CONSTANTS.GWL_STYLE)
             if ($style -eq 0) {
-                Write-Output-Message "Could not get window style for process: $procname"
+                Write-Output-Message "Could not get window style for process: $procname" -Type "Error"
                 continue
             }
             
@@ -325,11 +327,16 @@ function Suspend-Process {
                             ProcessName = $proc.ProcessName
                             WindowHandle = $windowHandle
                             WindowStyle = $style
+                            WindowTitle = $proc.MainWindowTitle
                             SuspendTime = Get-Date
                         }
                         Save-State
                         Write-Output-Message "Successfully suspended process: $procname (PID: $($proc.Id))"
+                    } else {
+                        Write-Output-Message "Failed to suspend process: $procname (PID: $($proc.Id))" -Type "Error"
                     }
+                } else {
+                    Write-Output-Message "Failed to open process: $procname (PID: $($proc.Id))" -Type "Error"
                 }
             }
         }
@@ -337,32 +344,38 @@ function Suspend-Process {
             Write-Output-Message "Error suspending process: $_" -Type "Error"
         }
     }
+    
+    return $true
 }
 
 function Resume-Process {
     param ([string]$procname)
     
     Write-Output-Message "Attempting to resume process: $procname"
-    $found = $false
+    $processesToResume = $Global:SuspendedProcesses.GetEnumerator() | Where-Object { $_.Value.ProcessName -eq $procname }
     
-    $suspended = @($Global:SuspendedProcesses.GetEnumerator() | Where-Object {
-        $_.Value.ProcessName -like "*$procname*"
-    })
+    if (!$processesToResume) {
+        Write-Output-Message "No suspended process found: $procname" -Type "Error"
+        return $false
+    }
     
-    foreach ($proc in $suspended) {
+    foreach ($proc in $processesToResume) {
         try {
-            $found = $true
             $handle = [ProcessControl]::OpenProcess(0x1F0FFF, $false, $proc.Key)
-            
             if ($handle -ne [IntPtr]::Zero) {
-                [ProcessControl]::NtResumeProcess($handle)
+                $result = [ProcessControl]::NtResumeProcess($handle)
                 [ProcessControl]::CloseHandle($handle)
                 
-                Show-Window $proc.Value.WindowHandle $proc.Value.WindowStyle
-                $Global:SuspendedProcesses.Remove($proc.Key)
-                Save-State
-                
-                Write-Output-Message "Successfully resumed process: $($proc.Value.ProcessName) (PID: $($proc.Key))"
+                if ($result -eq 0) {
+                    Show-Window $proc.Value.WindowHandle $proc.Value.WindowStyle
+                    $Global:SuspendedProcesses.Remove($proc.Key)
+                    Save-State
+                    Write-Output-Message "Successfully resumed process: $($proc.Value.ProcessName) (PID: $($proc.Key))"
+                } else {
+                    Write-Output-Message "Failed to resume process: $($proc.Value.ProcessName) (PID: $($proc.Key))" -Type "Error"
+                }
+            } else {
+                Write-Output-Message "Failed to open process: $($proc.Value.ProcessName) (PID: $($proc.Key))" -Type "Error"
             }
         }
         catch {
@@ -370,9 +383,7 @@ function Resume-Process {
         }
     }
     
-    if (!$found) {
-        Write-Output-Message "No suspended process found matching: $procname"
-    }
+    return $true
 }
 
 function Get-ProcessInfo {
@@ -411,7 +422,7 @@ function Get-AllProcessesStatus {
             $processes += @{
                 Name = $Global:SuspendedProcesses[$procId].ProcessName
                 Id = $procId
-                WindowTitle = ""
+                WindowTitle = $Global:SuspendedProcesses[$procId].WindowTitle
                 IsSuspended = $true
             }
         }

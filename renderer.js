@@ -3,6 +3,7 @@ let processFilter = '';
 let isRefreshing = false;
 let lastRefreshTime = 0;
 const REFRESH_COOLDOWN = 500; // Minimale Zeit zwischen Aktualisierungen in ms
+let showOnlyGames = true; // Standard: Nur Spiele anzeigen
 
 function showStatus(message, isError = false) {
     if (!message) return; // Keine leeren Nachrichten anzeigen
@@ -23,15 +24,93 @@ function showStatus(message, isError = false) {
     }, 3000);
 }
 
+// Hilfsfunktion zur Erkennung von Spielen
+function isGameProcess(process) {
+    const gameDirectories = [
+        'steam',
+        'steamapps',
+        'epic games',
+        'games',
+        'origin games',
+        'gog galaxy',
+        'xbox games',
+        'program files (x86)\\steam',
+        'program files\\steam'
+    ];
+
+    // Liste bekannter Spiele-Executables
+    const knownGames = [
+        'theescapists2',
+        'minecraft',
+        'rocketleague',
+        'csgo',
+        'dota2',
+        'gta5',
+        'gtav',
+        'ark',
+        'shootergame'  // ARK's executable name
+    ];
+
+    // Spiele-typische Wörter
+    const gameKeywords = [
+        'game',
+        'play',
+        'player',
+        'score',
+        'level',
+        'mission',
+        'survival',
+        'evolved'
+    ];
+
+    const path = (process.Path || '').toLowerCase();
+    const name = (process.Name || process.ProcessName || '').toLowerCase();
+    const title = (process.WindowTitle || '').toLowerCase();
+
+    // Prüfe auf bekannte Spiele
+    if (knownGames.some(game => name.includes(game))) {
+        return true;
+    }
+
+    // Prüfe auf Spiel-Verzeichnisse
+    if (gameDirectories.some(dir => path.toLowerCase().includes(dir))) {
+        // Wenn der Pfad ein Spieleverzeichnis enthält und es eine .exe ist,
+        // ist es wahrscheinlich ein Spiel
+        if (name.endsWith('.exe')) {
+            return true;
+        }
+    }
+
+    // Prüfe auf Spiele-typische Wörter im Fenstertitel oder Namen
+    if (gameKeywords.some(keyword => title.includes(keyword) || name.includes(keyword))) {
+        return true;
+    }
+
+    return false;
+}
+
 // Hilfsfunktion zum Filtern von Prozessen
 function matchesFilter(process, filter) {
-    if (!filter) return true;
-    filter = filter.toLowerCase();
+    if (!filter) {
+        // Wenn der Games-Only Filter aktiv ist, zeige nur Spiele
+        if (showOnlyGames) {
+            return isGameProcess(process);
+        }
+        return true;
+    }
     
+    filter = filter.toLowerCase();
     const name = (process.Name || process.ProcessName || '').toLowerCase();
     const title = (process.WindowTitle || '').toLowerCase();
     
-    return name.includes(filter) || title.includes(filter);
+    const matchesSearchFilter = name.includes(filter) || title.includes(filter);
+    
+    // Wenn der Games-Only Filter aktiv ist, muss der Prozess auch ein Spiel sein
+    if (showOnlyGames) {
+        return matchesSearchFilter && isGameProcess(process);
+    }
+    
+    return matchesSearchFilter;
 }
 
 async function suspendProcess() {
@@ -112,13 +191,19 @@ function createProcessElement(process) {
     const infoDiv = document.createElement('div');
     infoDiv.className = 'process-info';
     
-    const nameSpan = document.createElement('div');
-    nameSpan.className = 'process-name';
-    nameSpan.textContent = process.Name || process.ProcessName;
+    // Zuerst den WindowTitle anzeigen (falls vorhanden)
+    if (process.WindowTitle) {
+        const titleSpan = document.createElement('div');
+        titleSpan.className = 'process-name';
+        titleSpan.textContent = process.WindowTitle;
+        infoDiv.appendChild(titleSpan);
+    }
     
+    // Dann den Prozessnamen und die PID
     const detailsSpan = document.createElement('div');
     detailsSpan.className = 'process-details';
-    detailsSpan.textContent = `PID: ${process.Id || 'N/A'} | ${process.WindowTitle || ''}`;
+    detailsSpan.textContent = `${process.Name || process.ProcessName} (PID: ${process.Id || 'N/A'})`;
+    infoDiv.appendChild(detailsSpan);
     
     const buttonDiv = document.createElement('div');
     buttonDiv.className = 'process-actions';
@@ -134,8 +219,6 @@ function createProcessElement(process) {
         actionButton.onclick = () => suspendProcessById(process.Name || process.ProcessName);
     }
     
-    infoDiv.appendChild(nameSpan);
-    infoDiv.appendChild(detailsSpan);
     buttonDiv.appendChild(actionButton);
     div.appendChild(infoDiv);
     div.appendChild(buttonDiv);
@@ -237,6 +320,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (processFilterInput) {
         processFilterInput.addEventListener('input', (e) => {
             processFilter = e.target.value.trim();
+            refreshListsImmediate();
+        });
+    }
+    
+    // Event Listener für den Games-Only Toggle
+    const gamesOnlyToggle = document.getElementById('gamesOnlyToggle');
+    if (gamesOnlyToggle) {
+        gamesOnlyToggle.addEventListener('change', (e) => {
+            showOnlyGames = e.target.checked;
             refreshListsImmediate();
         });
     }

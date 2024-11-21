@@ -123,13 +123,81 @@
             max-height: 500px;
             overflow-y: auto;
         }
+        .controls-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .search-control {
+            flex: 1;
+        }
+        .toggle-control {
+            min-width: 200px;
+        }
         .search-box {
             width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
+            padding: 8px 12px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            box-sizing: border-box;
+            font-size: 14px;
+            margin-bottom: 0;
+        }
+        .toggle-wrapper {
+            display: flex;
+            align-items: center;
+            margin-left: 10px;
+        }
+        .toggle-text {
+            margin-right: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+        .toggle-container {
+            display: inline-block;
+            position: relative;
+            width: 50px;
+            height: 25px;
+            cursor: pointer;
+        }
+        .toggle-container input {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 0;
+            width: 0;
+        }
+        .toggle-label {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 25px;
+            width: 50px;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 34px;
+        }
+        .toggle-label:after {
+            content: "";
+            position: absolute;
+            left: 2px;
+            top: 2px;
+            width: 21px;
+            height: 21px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .toggle-container input:checked + .toggle-label {
+            background-color: #28a745;
+        }
+        .toggle-container input:checked + .toggle-label:after {
+            transform: translateX(25px);
         }
     </style>
 </head>
@@ -139,10 +207,25 @@
         
         <div id="status"></div>
 
+        <!-- Controls Section -->
+        <div class="controls-section">
+            <div class="search-control">
+                <input type="text" id="processFilter" class="search-box" placeholder="Filter processes...">
+            </div>
+            <div class="toggle-control">
+                <div class="toggle-wrapper">
+                    <span class="toggle-text">Show only Games</span>
+                    <label class="toggle-container">
+                        <input type="checkbox" id="gamesOnlyToggle" checked>
+                        <span class="toggle-label"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
         <div class="list-container">
             <div class="process-list">
                 <h3>All Processes</h3>
-                <input type="text" id="processFilter" class="search-box" placeholder="Filter processes...">
                 <div id="all-processes" class="scrollable-list"></div>
             </div>
 
