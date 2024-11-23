@@ -74,6 +74,7 @@ function executePowerShell(command: string, processName = ''): Promise<any> {
     scriptPath = path.join(process.env.APP_ROOT || '', 'Quick-Resume.ps1');
   }
 
+  // Der Befehl muss exakt so bleiben wie er ist, nur der Pfad muss korrekt sein
   const fullCommand = `powershell -ExecutionPolicy Bypass -NoProfile -NonInteractive -NoLogo -File "${scriptPath}" -Command "${command}" ${processName ? `-ProcessName "${processName}"` : ''}`;
 
   console.log('Executing PowerShell command:', fullCommand);
@@ -127,7 +128,7 @@ app.whenReady().then(() => {
   ipcMain.handle('suspend-process', async (_event, processName: string) => {
     try {
       console.log('Suspending process:', processName);
-      const result = await executePowerShell(`Suspend-Process -Name "${processName}"`, processName);
+      const result = await executePowerShell('Suspend-Process', processName);
       return { Success: true, Data: result };
     } catch (error: any) {
       console.error('Suspend process error:', error);
@@ -138,7 +139,7 @@ app.whenReady().then(() => {
   ipcMain.handle('resume-process', async (_event, processName: string) => {
     try {
       console.log('Resuming process:', processName);
-      const result = await executePowerShell(`Resume-Process -Name "${processName}"`, processName);
+      const result = await executePowerShell('Resume-Process', processName);
       return { Success: true, Data: result };
     } catch (error: any) {
       console.error('Resume process error:', error);
