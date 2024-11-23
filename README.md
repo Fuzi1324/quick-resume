@@ -41,22 +41,26 @@ You can install Quick Resume using the provided installer:
 ### Build Steps
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/yourusername/Quick_Resume.git
 cd Quick_Resume
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Run the application in development mode:
+
 ```bash
-npm start
+npm run dev
 ```
 
 4. Build the installer:
+
 ```bash
 npm run build
 ```
@@ -66,6 +70,7 @@ The installer will be created in the `dist` folder.
 ## Technical Details
 
 Quick Resume uses:
+
 - Electron for the user interface
 - PowerShell scripts for process manipulation
 - Windows native APIs for process handling
