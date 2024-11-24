@@ -397,11 +397,19 @@ function Get-ProcessInfo {
         $isSuspended = $true
     }
 
+    $path = ""
+    try {
+        $path = $Process.MainModule.FileName
+    } catch {
+        Write-Output-Message "Could not get path for process $($Process.ProcessName): $_" -Type "Warning"
+    }
+
     return @{
         Name = $Process.ProcessName
         Id = $Process.Id
         WindowTitle = $Process.MainWindowTitle
         IsSuspended = $isSuspended
+        Path = $path
     }
 }
 
@@ -424,6 +432,7 @@ function Get-AllProcessesStatus {
                 Id = $procId
                 WindowTitle = $Global:SuspendedProcesses[$procId].WindowTitle
                 IsSuspended = $true
+                Path = $Global:SuspendedProcesses[$procId].Path
             }
         }
     }

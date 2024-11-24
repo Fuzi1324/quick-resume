@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ProcessList from './components/ProcessList';
 import StatusBar from './components/StatusBar';
 import Controls from './components/Controls';
+import { isGameByName } from './services/gameService';
 import './App.css';
 
 declare global {
@@ -21,7 +22,7 @@ interface ProcessInfo {
   IsSuspended: boolean;
 }
 
-const REFRESH_COOLDOWN = 500; // Minimale Zeit zwischen Aktualisierungen in ms
+const REFRESH_COOLDOWN = 300; // Minimale Zeit zwischen Aktualisierungen in ms
 
 const App: React.FC = () => {
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
@@ -31,6 +32,8 @@ const App: React.FC = () => {
   const [isError, setIsError] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
+  const [filteredActiveProcesses, setFilteredActiveProcesses] = useState<ProcessInfo[]>([]);
+  const [filteredSuspendedProcesses, setFilteredSuspendedProcesses] = useState<ProcessInfo[]>([]);
 
   const refreshProcesses = async () => {
     if (isRefreshing) return;
@@ -58,7 +61,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Effekt, um Prozesse periodisch zu aktualisieren
   useEffect(() => {
     refreshProcesses();
     const interval = setInterval(refreshProcesses, 2000);
@@ -70,7 +72,6 @@ const App: React.FC = () => {
     setIsError(error);
   };
 
-  // Effekt, um die Statusmeldung nach 3 Sekunden auszublenden
   useEffect(() => {
     if (statusMessage) {
       const timeout = setTimeout(() => {
@@ -81,66 +82,48 @@ const App: React.FC = () => {
     }
   }, [statusMessage]);
 
-  // Hilfsfunktion zur Erkennung von Spielen
-  const isGameProcess = (process: ProcessInfo): boolean => {
-    const knownGames = [
-      'theescapists2',
-      'minecraft',
-      'rocketleague',
-      'csgo',
-      'dota2',
-      'gta5',
-      'gtav',
-      'ark',
-      'shootergame', // ARK's executable name
-    ];
-
-    const gameKeywords = [
-      'game',
-      'play',
-      'player',
-      'score',
-      'level',
-      'mission',
-      'survival',
-      'evolved',
-    ];
-
+  const isGameProcess = async (process: ProcessInfo): Promise<boolean> => {
     const name = (process.Name || '').toLowerCase();
-    const title = (process.WindowTitle || '').toLowerCase();
 
-    if (knownGames.some((game) => name.includes(game))) {
-      return true;
+    try {
+      return await isGameByName(name);
+    } catch (error) {
+      console.error('Fehler bei der Spielerkennung:', error);
+      return false;
     }
-
-    if (gameKeywords.some((keyword) => title.includes(keyword) || name.includes(keyword))) {
-      return true;
-    }
-
-    return false;
   };
 
-  // Hilfsfunktion zum Filtern von Prozessen
-  const matchesFilter = (process: ProcessInfo, filter: string): boolean => {
-    if (!filter) {
-      if (showOnlyGames) {
-        return isGameProcess(process);
+  useEffect(() => {
+    const filterProcesses = async () => {
+      const activeProcs: ProcessInfo[] = [];
+      const suspendedProcs: ProcessInfo[] = [];
+
+      for (const process of processes) {
+        // Textfilter anwenden
+        const name = (process.Name || '').toLowerCase();
+        const title = (process.WindowTitle || '').toLowerCase();
+        const filter = processFilter.toLowerCase();
+        const matchesTextFilter = !filter || name.includes(filter) || title.includes(filter);
+
+        if (!matchesTextFilter) continue;
+
+        // Prozess zur entsprechenden Liste hinzufügen
+        if (process.IsSuspended) {
+          suspendedProcs.push(process);
+        } else {
+          // Nur bei aktiven Prozessen den Games-Filter anwenden
+          if (!showOnlyGames || await isGameProcess(process)) {
+            activeProcs.push(process);
+          }
+        }
       }
-      return true;
-    }
 
-    filter = filter.toLowerCase();
-    const name = (process.Name || '').toLowerCase();
-    const title = (process.WindowTitle || '').toLowerCase();
+      setFilteredActiveProcesses(activeProcs);
+      setFilteredSuspendedProcesses(suspendedProcs);
+    };
 
-    const matchesSearchFilter = name.includes(filter) || title.includes(filter);
-
-    if (showOnlyGames) {
-      return matchesSearchFilter && isGameProcess(process);
-    }
-
-    return matchesSearchFilter;
-  };
+    filterProcesses();
+  }, [processes, processFilter, showOnlyGames]);
 
   const suspendProcessByName = async (processName: string) => {
     if (!processName) {
@@ -180,28 +163,13 @@ const App: React.FC = () => {
     }
   };
 
-  // Handler für den Prozessfilter
   const handleProcessFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setProcessFilter(event.target.value.trim());
   };
 
-  // Handler für den Games-Only-Schalter
   const handleGamesOnlyToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
     setShowOnlyGames(event.target.checked);
   };
-
-  // Filtern der Prozesse
-  const filteredProcesses = processes.filter((process) => {
-    if (process.IsSuspended) {
-      return matchesFilter(process, processFilter);
-    } else {
-      return matchesFilter(process, processFilter);
-    }
-  });
-
-  // Aufteilen in aktive und suspendierte Prozesse
-  const activeProcesses = filteredProcesses.filter((process) => !process.IsSuspended);
-  const suspendedProcesses = filteredProcesses.filter((process) => process.IsSuspended);
 
   return (
     <div className="container">
@@ -218,15 +186,15 @@ const App: React.FC = () => {
 
       <div className="list-container">
         <ProcessList
-          title="All Processes"
-          processes={activeProcesses}
+          title="Active Processes"
+          processes={filteredActiveProcesses}
           onSuspend={suspendProcessByName}
           onResume={resumeProcessByName}
         />
 
         <ProcessList
           title="Suspended Processes"
-          processes={suspendedProcesses}
+          processes={filteredSuspendedProcesses}
           onSuspend={suspendProcessByName}
           onResume={resumeProcessByName}
         />
